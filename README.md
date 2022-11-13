@@ -1,4 +1,5 @@
-# how to run this
+# how to run my solution
+
 ```
 docker-compose build
 docker-compose up -d 
@@ -6,6 +7,19 @@ docker-compose exec api npm run ingest_data
 docker-compose exec api npm run test
 ```
 
+# choices
+went with typescript since i am most comfortable with it
+
+postgresql section is rougher than it should be. partially due to the small scale of the problem as it exists today partially due to not using posgresql for many years 
+
+test suite is a collection of integ tests against the local server using axios. tests verify positive tests and some invalid inputs (input validation was limited due to time boxing the solution)
+
+chose to implement the tests over the bounus stories since the tests quickly allow one to verify that the system is in a working state (rather important when doing refactoring)
+
+# some nice to haves (that are outside of the scope of this project)
+1. swagger (or similiar) api definition to handle sharing the api shape b/w client(s) and server
+2. server metrics
+3. a cleaner way of updating records in the db instead of dropping the all the tables and re-creating them from scratch. the current solution works ok with the given data set since it takes 500ms the run throught the ingestion script from my machine currently (deleting all the rows from the tables is only 10ms faster). would be faster to bulk inserts
 
 ---------------------------------
 
