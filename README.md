@@ -1,8 +1,10 @@
 # how to run this
+```
 docker-compose build
 docker-compose up -d 
 docker-compose exec api npm run ingest_data
 docker-compose exec api npm run test
+```
 
 
 ---------------------------------
