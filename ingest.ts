@@ -12,10 +12,11 @@
 import { Client } from 'pg'
 import { promises as fs } from 'fs'
 import { parse, } from 'csv-parse/sync' // easier for small data set
+const PG_HOST = process.env.PG_HOST || 'localhost'
 
 async function main(recreateTables = true) {
     const client = new Client({
-        host: 'localhost',
+        host: PG_HOST,
         port: 5432,
         user: 'candidate',
         password: 'password123',
@@ -24,38 +25,38 @@ async function main(recreateTables = true) {
     console.debug('connecting to DB')
     await client.connect()
 
-    if (recreateTables) {
-        console.debug('dropping tables if they exist')
-        const res = await client.query(`DROP TABLE IF EXISTS equipment, events, locations, waybills CASCADE`)
+    console.debug('dropping tables if they exist')
+    const res = await client.query(`DROP TABLE IF EXISTS equipment, events, locations, waybills CASCADE`)
 
 
-        /**
-         * todo: enums?
-         * todo: indecies?
-         * todo: constraints
-         * todo: secondary index
-         * non-null VS nullable
-         */
+    /**
+     * todo: enums?
+     * todo: indecies?
+     * todo: constraints
+     * todo: secondary index
+     * non-null VS nullable columns
+     * VCHAR vs TEXT to tighten things up
+     */
 
-        console.debug('creating equipment table')
-        await client.query(`CREATE TABLE equipment(
+    console.debug('creating equipment table')
+    await client.query(`CREATE TABLE equipment(
         id INT PRIMARY KEY,
         customer TEXT,
         fleet TEXT,
         equipment_id TEXT,
         equipment_status CHAR(1),
-        date_added DATE,
-        date_removed DATE
+        date_added TIMESTAMP,
+        date_removed TIMESTAMP
     )`)
 
-        console.debug('creating events table')
-        await client.query(`CREATE TABLE events(
+    console.debug('creating events table')
+    await client.query(`CREATE TABLE events(
         id INT PRIMARY KEY,
         equipment_id TEXT,
-        sighting_date DATE,
+        sighting_date TIMESTAMP,
         sighting_event_code INT,
         reporting_railroad_scac TEXT,
-        posting_date DATE,
+        posting_date TIMESTAMP,
         from_mark_id TEXT,
         load_empty_status CHAR(1),
         sighting_claim_code CHAR(1),
@@ -66,8 +67,8 @@ async function main(recreateTables = true) {
         waybill_id INT
     )`)
 
-        console.debug('creating locations table')
-        await client.query(`CREATE TABLE locations(
+    console.debug('creating locations table')
+    await client.query(`CREATE TABLE locations(
         id INT PRIMARY KEY,
         city TEXT,
         city_long TEXT,
@@ -82,13 +83,13 @@ async function main(recreateTables = true) {
         country CHAR(2)
     )`)
 
-        console.debug('creating waybills table')
-        await client.query(`CREATE TABLE waybills(
+    console.debug('creating waybills table')
+    await client.query(`CREATE TABLE waybills(
         id INT PRIMARY KEY,
         equipment_id TEXT,
-        waybill_date DATE,
+        waybill_date TIMESTAMP,
         waybill_number INT,
-        created_date DATE,
+        created_date TIMESTAMP,
         billing_road_mark_name TEXT,
         waybill_source_code CHAR(1),
         load_empty_status CHAR(1),
@@ -96,7 +97,7 @@ async function main(recreateTables = true) {
         destination_mark_name TEXT,
         sending_road_mark TEXT,
         bill_of_lading_number TEXT,
-        bill_of_lading_date DATE,
+        bill_of_lading_date TIMESTAMP,
         equipment_weight INT,
         tare_weight INT,
         allowable_weight INT,
@@ -109,8 +110,6 @@ async function main(recreateTables = true) {
         routes JSON,
         parties JSON
     )`)
-    }
-
 
     // TODO: clean up special case for NULL dates for equipment
     // Parse the CSV content
@@ -118,12 +117,12 @@ async function main(recreateTables = true) {
     equipmentRecords.shift()//remove key name records
     console.debug('inserting equipment')
     for (let i = 0; i < equipmentRecords.length; i++) {
-        // does the row have a date_removed value (if no,  then dont insert)
+        // does the row have a null date_removed value (if no,  then dont insert)
         const removed = !!equipmentRecords[i][6]
         if (removed) {
             await client.query(`INSERT INTO equipment(id, customer, fleet, equipment_id, equipment_status, date_added, date_removed) VALUES($1, $2, $3, $4, $5, $6, $7)`, equipmentRecords[i])
         } else {
-            equipmentRecords[i].pop()
+            equipmentRecords[i].pop() // remove null date_removed value
             await client.query(`INSERT INTO equipment(id, customer, fleet, equipment_id, equipment_status, date_added) VALUES($1, $2, $3, $4, $5, $6)`, equipmentRecords[i])
         }
 
@@ -131,15 +130,13 @@ async function main(recreateTables = true) {
     await insertRows(client, 'events')
     await insertRows(client, 'locations')
     await insertRows(client, 'waybills')
-
-
     await client.end()
 }
 
 main()
 
 // generate the values part of the insert query for a given array length (ie $1, $2, .....)
-function genString(length: number): string {
+function genValuesString(length: number): string {
     return Array(length).fill('').map((_, index) => `$${index + 1}`).join(', ')
 }
 
@@ -150,7 +147,7 @@ async function insertRows(client: Client, fileName: string) {
     const columns = (records.shift() as string[])//remove key name records
 
     for (let i = 0; i < records.length; i++) {
-        await client.query(`INSERT INTO ${fileName}(${columns?.join(', ')}) VALUES(${genString(columns?.length)})`, records[i].map(c => c || null))
+        await client.query(`INSERT INTO ${fileName}(${columns?.join(', ')}) VALUES(${genValuesString(columns?.length)})`, records[i].map(c => c || null))
     }
 }
 

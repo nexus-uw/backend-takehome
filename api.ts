@@ -6,10 +6,11 @@ import morgan from 'morgan'
 
 const app = Express()
 const PORT = 8000
+const PG_HOST = process.env.PG_HOST || 'localhost'
 
 // note: not the best practice to hardcode DB creds into the source file
 const client = new Client({
-    host: 'localhost',
+    host: PG_HOST,
     port: 5432,
     user: 'candidate',
     password: 'password123',
